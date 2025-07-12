@@ -1,3 +1,6 @@
 .qodo/
 server_config.json
 client_config.json
+server.log
+zaptun-server
+*.json
