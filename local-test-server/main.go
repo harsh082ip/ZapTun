@@ -11,6 +11,7 @@ const APP_PORT = ":8080"
 func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
+		fmt.Println("host: ", r.Host)
 		fmt.Fprint(w, `
 			<!DOCTYPE html>
 			<html lang="en">

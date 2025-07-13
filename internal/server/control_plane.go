@@ -34,8 +34,14 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 	s.logger.LogInfoMessage().Msg("New client connected...")
 
+	// yamux config
+	yamuxConfig := yamux.DefaultConfig()
+	yamuxConfig.EnableKeepAlive = false
+	// yamuxConfig.KeepAliveInterval = 60 * time.Hour
+	// yamuxConfig.ConnectionWriteTimeout = 15 * time.Second
+
 	// wrap raw TCP into a yamux session
-	session, err := yamux.Server(conn, nil)
+	session, err := yamux.Server(conn, yamuxConfig)
 	if err != nil {
 		s.logger.LogErrorMessage().Err(err).Msg("Failed to create yamux session")
 		return

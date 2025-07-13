@@ -49,8 +49,14 @@ func (c *Client) connectAndServe() error {
 	}
 	defer conn.Close()
 
+	// yamux config
+	yamuxConfig := yamux.DefaultConfig()
+	yamuxConfig.EnableKeepAlive = false
+	// yamuxConfig.KeepAliveInterval = 60 * time.Hour
+	// yamuxConfig.ConnectionWriteTimeout = 15 * time.Second
+
 	// Establish a yamux session over the TCP connection.
-	session, err := yamux.Client(conn, nil)
+	session, err := yamux.Client(conn, yamuxConfig)
 	if err != nil {
 		c.logger.LogErrorMessage().Msgf("failed to establish a yamux session over tcp connection, err: %+v", err)
 		return fmt.Errorf("failed to establish a yamux session over tcp connection, err: %+v", err)

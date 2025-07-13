@@ -4,3 +4,5 @@ client_config.json
 server.log
 zaptun-server
 *.json
+stress-test
+zaptun-client
