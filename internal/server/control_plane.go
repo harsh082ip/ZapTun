@@ -33,6 +33,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	s.logger.LogInfoMessage().Msg("New client connected...")
+	fmt.Printf("%s", conn.RemoteAddr())
 
 	// yamux config
 	yamuxConfig := yamux.DefaultConfig()

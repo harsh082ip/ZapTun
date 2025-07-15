@@ -17,14 +17,14 @@ type Server struct {
 	conf    *config.ServerConfig
 	logger  *log.Logger
 	clients map[string]*Client
-	mutex   sync.RWMutex
+	mutex   *sync.RWMutex
 }
 
 func NewServer(conf *config.ServerConfig, logger *log.Logger) *Server {
 	return &Server{
 		conf:    conf,
 		logger:  logger,
-		clients: make(map[string]*Client),
+		clients: make(map[string]*Client, 0),
 	}
 }
 
