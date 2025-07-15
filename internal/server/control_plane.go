@@ -25,7 +25,7 @@ func (s *Server) startControlPlane() {
 		}
 
 		// handle net.conn
-		s.handleConnection(conn)
+		go s.handleConnection(conn)
 	}
 }
 
@@ -99,6 +99,6 @@ func (s *Server) handleConnection(conn net.Conn) {
 	// We read from the connection in a loop. If the client disconnects,
 	// the Read() will fail, the function will exit, and the deferred cleanup will run.
 	// io.Copy(io.Discard, conn) is a simple way to do this.
-	io.Copy(io.Discard, conn)
+	io.Copy(io.Discard, ctrlStream)
 
 }

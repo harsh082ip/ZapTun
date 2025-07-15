@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-const APP_PORT = ":8080"
+const APP_PORT = ":8082"
 
 func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

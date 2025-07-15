@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,7 +18,8 @@ func makeRequest(url string, id int, wg *sync.WaitGroup, completed *int64, faile
 
 	// Create HTTP client with timeout
 	client := &http.Client{
-		Timeout: 10 * time.Second,
+		// Timeout: 10 * time.Second,
+		Timeout: 1 * time.Minute,
 	}
 
 	// Make the request
@@ -52,7 +54,8 @@ func makeRequest(url string, id int, wg *sync.WaitGroup, completed *int64, faile
 		(len(responseStr) > 0 && (responseStr == "subdomain for client_id: kejlkq28 not found in the regisry, or client has disconnected" ||
 			responseStr == "subdomain not found in the regisry, or client has disconnected" ||
 			responseStr == "client has disconnected" ||
-			responseStr == "subdomain not found")) {
+			responseStr == "subdomain not found" ||
+			strings.Contains(responseStr, "not found in the regisry, or client has disconnected"))) {
 		atomic.AddInt64(failed, 1)
 	} else {
 		atomic.AddInt64(completed, 1)

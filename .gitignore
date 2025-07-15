@@ -6,3 +6,4 @@ zaptun-server
 *.json
 stress-test
 zaptun-client
+local-server
