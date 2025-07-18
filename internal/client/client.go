@@ -79,7 +79,7 @@ func (c *Client) connectAndServe() error {
 	}
 	cleaned := strings.TrimSuffix(assignedURL, "\n")
 	assignedURL = cleaned
-	c.logger.LogInfoMessage().Msgf("Tunnel is live at: http://%s:8082", assignedURL)
+	c.logger.LogInfoMessage().Msgf("Tunnel is live at: http://%s", assignedURL)
 
 	// Start listening for new streams from the server (for proxied requests)
 	for {

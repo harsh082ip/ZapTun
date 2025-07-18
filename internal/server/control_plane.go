@@ -58,10 +58,10 @@ func (s *Server) handleConnection(conn net.Conn) {
 		return
 	}
 
-	//  Generate unique cname or client id
+	//  Generate unique subdomain or client id
 	var clientID string
 	for {
-		clientID = generateRandomCNAME(8)
+		clientID = generateRandomSubdomain(8)
 		_, clientExists := s.clients[clientID]
 		if !clientExists {
 			break

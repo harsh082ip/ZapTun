@@ -33,9 +33,9 @@ func (s *Server) proxyHandler(w http.ResponseWriter, r *http.Request) {
 	s.logger.LogInfoMessage().Msgf("hostparts: %+v", hostParts)
 
 	// lookup for client in our registry
-	s.mutex.Lock()
+	s.mutex.RLock()
 	client, found := s.clients[clientID]
-	s.mutex.Unlock()
+	s.mutex.RUnlock()
 
 	if !found {
 		s.logger.LogErrorMessage().Msgf("subdomain for client_id: %v not found in the regisry, or client has disconnected", clientID)
