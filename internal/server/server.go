@@ -1,6 +1,7 @@
 package server
 
 import (
+	"net"
 	"sync"
 
 	"github.com/harsh082ip/ZapTun/config"
@@ -9,22 +10,25 @@ import (
 )
 
 type Client struct {
-	id      string // unique subdomain
-	session *yamux.Session
+	id       string // unique subdomain
+	session  *yamux.Session
+	listener net.Listener
 }
 
 type Server struct {
-	conf    *config.ServerConfig
-	logger  *log.Logger
-	clients map[string]*Client
-	mutex   sync.RWMutex
+	conf        *config.ServerConfig
+	logger      *log.Logger
+	clients     map[string]*Client
+	mutex       sync.RWMutex
+	nextTCPPort int
 }
 
 func NewServer(conf *config.ServerConfig, logger *log.Logger) *Server {
 	return &Server{
-		conf:    conf,
-		logger:  logger,
-		clients: make(map[string]*Client),
+		conf:        conf,
+		logger:      logger,
+		clients:     make(map[string]*Client),
+		nextTCPPort: 30000, // will change port allocation logic in future PRs
 	}
 }
 

@@ -1,10 +1,12 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 
+	"github.com/harsh082ip/ZapTun/pkg/tunnel"
 	"github.com/hashicorp/yamux"
 )
 
@@ -58,18 +60,37 @@ func (s *Server) handleConnection(conn net.Conn) {
 		return
 	}
 
-	//  Generate unique subdomain or client id
+	// decode tunnel type from ctrlstream
+	var msg tunnel.ControlMessage
+	if err := json.NewDecoder(ctrlStream).Decode(&msg); err != nil {
+		s.logger.LogErrorMessage().Err(err).Msg("Failed to decode control message")
+		return
+	}
+
+	switch msg.Type {
+	case "http":
+		s.handleHTTPTunnel(conn, session, ctrlStream)
+	case "tcp":
+		s.handleTCPTunnel(conn, session, ctrlStream)
+	}
+}
+
+// handleHTTPTunnel contains the logic for setting up an HTTP tunnel.
+func (s *Server) handleHTTPTunnel(conn net.Conn, session *yamux.Session, ctrlStream net.Conn) {
+	s.logger.LogInfoMessage().Msg("Handling HTTP tunnel request...")
+
+	// Generate unique subdomain
 	var clientID string
 	for {
 		clientID = generateRandomSubdomain(8)
+		s.mutex.RLock()
 		_, clientExists := s.clients[clientID]
+		s.mutex.RUnlock()
 		if !clientExists {
 			break
 		}
-		s.logger.LogInfoMessage().Msgf("clientID: %v, already exists, attempting to create new one", clientID)
 	}
 
-	// Register new client
 	newClient := &Client{
 		id:      clientID,
 		session: session,
@@ -78,7 +99,6 @@ func (s *Server) handleConnection(conn net.Conn) {
 	s.clients[clientID] = newClient
 	s.mutex.Unlock()
 
-	// defer - proper cleanup for this client
 	defer func() {
 		s.mutex.Lock()
 		delete(s.clients, clientID)
@@ -87,19 +107,106 @@ func (s *Server) handleConnection(conn net.Conn) {
 		s.logger.LogInfoMessage().Msgf("Client: %v disconnected. Removed from registry", clientID)
 	}()
 
-	// send assigned url back to the client
 	assignedURL := fmt.Sprintf("%s.%s", clientID, s.conf.Domain)
-	_, err = ctrlStream.Write([]byte(assignedURL + "\n"))
-	if err != nil {
+	if _, err := ctrlStream.Write([]byte(assignedURL + "\n")); err != nil {
 		s.logger.LogErrorMessage().Err(err).Msg("Failed to send assigned URL to client")
-		return // This will trigger the deferred cleanup.
+		return
 	}
 	s.logger.LogInfoMessage().Msgf("Assigned URL %s to client %s", assignedURL, conn.RemoteAddr().String())
 
-	// 5. Keep the connection alive.
-	// We read from the connection in a loop. If the client disconnects,
-	// the Read() will fail, the function will exit, and the deferred cleanup will run.
-	// io.Copy(io.Discard, conn) is a simple way to do this.
+	// Block to keep the control stream alive and detect disconnection
 	io.Copy(io.Discard, ctrlStream)
+}
 
+func (s *Server) handleTCPTunnel(conn net.Conn, session *yamux.Session, ctrlStream net.Conn) {
+	s.logger.LogInfoMessage().Msg("Handling TCP tunnel request...")
+
+	// 1. Allocate a new port for this client
+	// will make port allocation logic more robust
+	s.mutex.Lock()
+	port := s.nextTCPPort
+	s.nextTCPPort++
+	s.mutex.Unlock()
+
+	publicAddr := fmt.Sprintf("0.0.0.0:%d", port)
+
+	// 2. Start a new public TCP listener on the allocated port
+	listener, err := net.Listen("tcp", publicAddr)
+	if err != nil {
+		s.logger.LogErrorMessage().Msgf("Failed to start public listener on %s, err: %+v", publicAddr, err)
+		// Inform the client that the setup failed
+		ctrlStream.Write([]byte("error: could not allocate public port\n"))
+		return
+	}
+
+	s.logger.LogInfoMessage().Msgf("TCP tunnel listening for public connections on %s", publicAddr)
+
+	// 3. Register the client, now including its listener
+	clientID := generateRandomSubdomain(8)
+	newClient := &Client{
+		id:       clientID,
+		session:  session,
+		listener: listener, // Store the listener
+	}
+	s.mutex.Lock()
+	s.clients[clientID] = newClient
+	s.mutex.Unlock()
+
+	// 4. Defer cleanup
+	defer func() {
+		s.mutex.Lock()
+		delete(s.clients, clientID)
+		s.mutex.Unlock()
+		session.Close()
+		listener.Close()
+		s.logger.LogInfoMessage().Msgf("Client %v disconnected. Closed public listener on %s.", clientID, publicAddr)
+	}()
+
+	// Inform the client of its public address
+	publicURL := fmt.Sprintf("%s:%d", s.conf.Domain, port)
+	if _, err := ctrlStream.Write([]byte(publicURL + "\n")); err != nil {
+		s.logger.LogErrorMessage().Err(err).Msg("Failed to send assigned URL to client")
+		return
+	}
+
+	// Start the proxying loop for the new public listener
+	go s.proxyTCP(listener, session)
+
+	// keep the control stream(zaptun-client) alive
+	io.Copy(io.Discard, ctrlStream)
+}
+
+// proxyTCP accepts public connections and forwards them to the client via yamux streams.
+func (s *Server) proxyTCP(listener net.Listener, session *yamux.Session) {
+	for {
+		// Accept a new connection from the public internet
+		publicConn, err := listener.Accept()
+		if err != nil {
+			// This error likely means the listener was closed, so we can exit.
+			s.logger.LogWarnMessage().Err(err).Msg("Public TCP listener failed to accept")
+			return
+		}
+
+		s.logger.LogInfoMessage().Msgf("Accepted new public TCP connection from %s", publicConn.RemoteAddr())
+
+		// For each public connection, open a new stream to the client
+		proxyStream, err := session.OpenStream()
+		if err != nil {
+			s.logger.LogErrorMessage().Err(err).Msg("Failed to open yamux stream for TCP proxy")
+			publicConn.Close()
+			continue
+		}
+
+		// copy the data concurrently
+		go func() {
+			defer proxyStream.Close()
+			defer publicConn.Close()
+			io.Copy(proxyStream, publicConn)
+		}()
+		go func() {
+			defer proxyStream.Close()
+			defer publicConn.Close()
+			io.Copy(publicConn, proxyStream)
+		}()
+	}
 }
