@@ -17,7 +17,6 @@ import (
 
 type Config struct {
 	Debug      bool
-	Verbose    bool
 	ConfigPath string
 	// Add more flags here as needed
 }
@@ -33,8 +32,6 @@ func parseArgs() (tunnelType string, localPort int, config Config) {
 		switch {
 		case arg == "--debug" || arg == "-d":
 			config.Debug = true
-		case arg == "--verbose" || arg == "-v":
-			config.Verbose = true
 		case strings.HasPrefix(arg, "--config="):
 			configPath := strings.TrimPrefix(arg, "--config=")
 			if configPath == "" {
@@ -109,14 +106,12 @@ func main() {
 
 	if cfg.Debug {
 		logLevel = zerolog.DebugLevel
-	} else if cfg.Verbose {
-		logLevel = zerolog.InfoLevel
 	}
 
 	appLogger := logger.NewLogger(logWriter, logLevel, "tunnel-client")
 
 	// Log configuration if verbose
-	if cfg.Verbose {
+	if cfg.Debug {
 		appLogger.LogInfoMessage().
 			Str("tunnel_type", tunnelType).
 			Int("local_port", localPort).
@@ -132,7 +127,7 @@ func main() {
 	srv, _ := client.NewClient(clientCfg.ServerAddr, controlMsg, localPort, appLogger)
 	appLogger.LogInfoMessage().Msgf("Starting Zaptun client for %s tunnel", tunnelType)
 
-	if err := srv.Start(); err != nil {
+	if err := srv.Start(logLevel); err != nil {
 		appLogger.LogFatalMessage().Err(err).Msg("Client failed to start")
 	}
 }

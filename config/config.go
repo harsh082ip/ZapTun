@@ -18,6 +18,8 @@ type ServerConfig struct {
 	DataPlaneAddr    string `json:"data_plane_addr"`    // e.g., ":80"
 	LogFile          string `json:"log_file"`           // e.g., "/var/log/zaptun/server.log"
 	LogLevel         string `json:"log_level"`          // e.g., "info", "debug"
+	CertificatePath  string `json:"certificate_path"`
+	PrivateKeyPath   string `json:"private_key_path"`
 }
 
 // ClientConfig holds all configuration for the tunnel-client.

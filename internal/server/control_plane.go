@@ -15,6 +15,11 @@ func (s *Server) startControlPlane() {
 	certPath := "cert.pem"
 	keyPath := "privkey.pem"
 
+	if s.conf.CertificatePath != "" && s.conf.PrivateKeyPath != "" {
+		certPath = s.conf.CertificatePath
+		keyPath = s.conf.PrivateKeyPath
+	}
+
 	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
 	if err != nil {
 		s.logger.LogInfoMessage().Msgf("Failed to load TLS certificate, err:%v", err)

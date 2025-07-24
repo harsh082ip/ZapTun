@@ -14,12 +14,14 @@ import (
 	"github.com/harsh082ip/ZapTun/pkg/logger"
 	"github.com/harsh082ip/ZapTun/pkg/tunnel"
 	"github.com/hashicorp/yamux"
+	"github.com/rs/zerolog"
 )
 
 type Client struct {
 	serverAddr string
 	localPort  int
 	controlMsg *tunnel.ControlMessage
+	logLevel   zerolog.Level
 	logger     *logger.Logger
 }
 
@@ -29,12 +31,14 @@ func NewClient(serverAddr string, controlMsg *tunnel.ControlMessage, localPort i
 		localPort:  localPort,
 		controlMsg: controlMsg,
 		logger:     log,
+		logLevel:   zerolog.Disabled,
 	}, nil
 }
 
-func (c *Client) Start() error {
+func (c *Client) Start(logLevel zerolog.Level) error {
 	c.logger.LogInfoMessage().Msgf("Connecting to server at %s", c.serverAddr)
 	c.logger.LogInfoMessage().Msgf("Will forward traffic to localhost:%d", c.localPort)
+	c.logLevel = logLevel
 	for {
 		if err := c.connectAndServe(); err != nil {
 			c.logger.LogErrorMessage().Err(err).Msg("Connection error. Retrying in 5 seconds...")
@@ -80,8 +84,27 @@ func (c *Client) connectAndServe() error {
 	response = strings.TrimSpace(response)
 
 	if c.controlMsg.Type == "http" {
+		if c.logLevel == zerolog.Disabled {
+			fmt.Print("\033[H\033[2J") // clear
+			fmt.Printf("Status: \t Online \n")
+			fmt.Printf("Protocol: \t %s \n", strings.ToUpper(c.controlMsg.Type))
+			fmt.Printf("Forwarding: \t %s -> %s \n",
+				fmt.Sprintf("https://%s", response),
+				fmt.Sprintf("http://localhost:%d", c.localPort))
+		}
 		c.logger.LogInfoMessage().Msgf("Tunnel is live at: http://%s", response)
+
 	} else {
+		if c.logLevel == zerolog.Disabled {
+			fmt.Print("\033[H\033[2J") // clear
+			fmt.Printf("Status: \t Online \n")
+			fmt.Printf("Protocol: \t %s \n", strings.ToUpper(c.controlMsg.Type))
+			fmt.Printf("Forwarding:\t%s -> %s\n",
+				fmt.Sprintf("tcp://%s", response),
+				fmt.Sprintf("tcp://localhost:%d", c.localPort),
+			)
+
+		}
 		c.logger.LogInfoMessage().Msgf("Tunnel is live at: %s", response)
 	}
 
@@ -97,7 +120,9 @@ func (c *Client) connectAndServe() error {
 func (c *Client) handleProxyStream(proxyStream net.Conn, tunnelType string) {
 	defer proxyStream.Close()
 	c.logger.LogInfoMessage().Msgf("Accepted new %s stream from server", tunnelType)
-
+	if c.logLevel == zerolog.Disabled {
+		fmt.Printf("Incoming: \t %s \n", proxyStream.RemoteAddr())
+	}
 	localServiceConn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", c.localPort))
 	if err != nil {
 		c.logger.LogErrorMessage().Err(err).Msgf("Failed to connect to local service on port %d", c.localPort)
