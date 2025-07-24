@@ -2,6 +2,7 @@ package client
 
 import (
 	"bufio"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -43,7 +44,10 @@ func (c *Client) Start() error {
 }
 
 func (c *Client) connectAndServe() error {
-	conn, err := net.Dial("tcp", c.serverAddr)
+	tlsConfig := &tls.Config{
+		// InsecureSkipVerify: true,
+	}
+	conn, err := tls.Dial("tcp", c.serverAddr, tlsConfig)
 	if err != nil {
 		return fmt.Errorf("failed to connect to control plane server: %w", err)
 	}

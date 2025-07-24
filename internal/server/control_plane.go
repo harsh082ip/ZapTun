@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,16 +12,26 @@ import (
 )
 
 func (s *Server) startControlPlane() {
+	certPath := "cert.pem"
+	keyPath := "privkey.pem"
+
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	if err != nil {
+		s.logger.LogInfoMessage().Msgf("Failed to load TLS certificate, err:%v", err)
+	}
+
+	tlsConfig := &tls.Config{Certificates: []tls.Certificate{cert}}
 	listener, err := net.Listen("tcp", s.conf.ControlPlaneAddr)
 	if err != nil {
 		s.logger.LogErrorMessage().Msgf("failed to start control plane on: %v, err: %+v", s.conf.ControlPlaneAddr, err)
 		return
 	}
-	defer listener.Close()
+	tlsListener := tls.NewListener(listener, tlsConfig)
+	defer tlsListener.Close()
 
 	s.logger.LogInfoMessage().Msgf("Starting Control Plane on: %v", s.conf.ControlPlaneAddr)
 	for {
-		conn, err := listener.Accept()
+		conn, err := tlsListener.Accept()
 		if err != nil {
 			s.logger.LogErrorMessage().Msgf("failed to accept connection on control plane, err: %+v", err)
 			continue

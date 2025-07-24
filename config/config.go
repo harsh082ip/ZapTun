@@ -13,7 +13,7 @@ const (
 
 // ServerConfig holds all configuration for the tunnel-server.
 type ServerConfig struct {
-	Domain           string `json:"domain"`             // e.g., "zaptun.com"
+	Domain           string `json:"domain"`             // e.g., "zaptun.site"
 	ControlPlaneAddr string `json:"control_plane_addr"` // e.g., ":4443"
 	DataPlaneAddr    string `json:"data_plane_addr"`    // e.g., ":80"
 	LogFile          string `json:"log_file"`           // e.g., "/var/log/zaptun/server.log"
@@ -22,7 +22,7 @@ type ServerConfig struct {
 
 // ClientConfig holds all configuration for the tunnel-client.
 type ClientConfig struct {
-	ServerAddr string `json:"server_addr"` // e.g., "zaptun.com:4443"
+	ServerAddr string `json:"server_addr"` // e.g., "zaptun.site:4443"
 	AuthToken  string `json:"auth_token"`  // The token to authenticate with the server
 }
 
@@ -57,10 +57,7 @@ func LoadClientConfig(path string) (*ClientConfig, error) {
 	}
 	if !fileExists(path) {
 		// Return a default configuration if the file doesn't exist
-		return &ClientConfig{
-			ServerAddr: "example.com:4443",
-			AuthToken:  "",
-		}, nil
+		return nil, fmt.Errorf("config file doesn't exists")
 	}
 
 	f, err := os.ReadFile(path)
