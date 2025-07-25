@@ -99,7 +99,7 @@ func (c *Client) connectAndServe() error {
 			fmt.Print("\033[H\033[2J") // clear
 			fmt.Printf("Status: \t Online \n")
 			fmt.Printf("Protocol: \t %s \n", strings.ToUpper(c.controlMsg.Type))
-			fmt.Printf("Forwarding:\t%s -> %s\n",
+			fmt.Printf("Forwarding:\t %s -> %s\n",
 				fmt.Sprintf("tcp://%s", response),
 				fmt.Sprintf("tcp://localhost:%d", c.localPort),
 			)

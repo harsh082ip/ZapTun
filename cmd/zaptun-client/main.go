@@ -108,7 +108,7 @@ func main() {
 		logLevel = zerolog.DebugLevel
 	}
 
-	appLogger := logger.NewLogger(logWriter, logLevel, "tunnel-client")
+	appLogger := logger.NewLogger(logWriter, logLevel, "zaptun-client")
 
 	// Log configuration if verbose
 	if cfg.Debug {
