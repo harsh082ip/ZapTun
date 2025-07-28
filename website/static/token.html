@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZapTun - Authentication Successful</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@500&family=Inter:wght@400;600;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0A0A0A;
+            --text-color: #EAEAEA;
+            --secondary-text-color: #888888;
+            --border-color: #222222;
+            --accent-color: #58a6ff;
+            --card-bg: rgba(17, 17, 17, 0.7);
+            --success-color: #28a745;
+            --font-sans: 'Inter', system-ui, sans-serif;
+            --font-mono: 'Fira Code', monospace;
+        }
+
+        /* --- General Resets & Body --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { font-size: 16px; }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-sans);
+            line-height: 1.6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+            overflow: hidden;
+            background-image:
+                radial-gradient(circle at var(--x) var(--y), rgba(88, 166, 255, 0.1), transparent 30vw),
+                linear-gradient(var(--border-color) 1px, transparent 1px),
+                linear-gradient(to right, var(--border-color) 1px, var(--bg-color) 1px);
+            background-size: cover, 40px 40px, 40px 40px;
+        }
+
+        /* --- Main Auth Card --- */
+        .auth-card {
+            width: 100%;
+            max-width: 550px;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2.5rem 3rem;
+            backdrop-filter: blur(10px);
+            text-align: center;
+            animation: fade-in 0.8s ease-out;
+        }
+        
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .success-icon {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 1.5rem auto;
+            background-color: rgba(40, 167, 69, 0.1);
+            border: 1px solid rgba(40, 167, 69, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .success-icon svg {
+            width: 32px;
+            height: 32px;
+            color: var(--success-color);
+        }
+
+        h1 {
+            font-weight: 900;
+            font-size: 1.8rem;
+            letter-spacing: -1px;
+            color: var(--text-color);
+            margin-bottom: 0.5rem;
+        }
+
+        p {
+            color: var(--secondary-text-color);
+            max-width: 40ch;
+            margin: 0 auto 1.5rem auto;
+        }
+        
+        /* --- Code Block --- */
+        .code-block {
+            background: #010409;
+            border: 1px solid var(--border-color);
+            padding: 1.25rem 1.5rem;
+            border-radius: 8px;
+            font-family: var(--font-mono);
+            font-size: 1rem;
+            position: relative;
+            text-align: left;
+            white-space: nowrap;
+            overflow-x: auto;
+        }
+        .code-block .prompt {
+            color: var(--secondary-text-color);
+            margin-right: 0.75rem;
+        }
+        .code-block .command {
+            color: var(--text-color);
+        }
+        .code-block .token {
+            color: var(--accent-color);
+        }
+
+        .copy-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #ffffff10;
+            border: 1px solid var(--border-color);
+            color: var(--secondary-text-color);
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: var(--font-sans);
+            font-size: 0.8rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            opacity: 0.6;
+        }
+        .code-block:hover .copy-button {
+            opacity: 1;
+        }
+        .copy-button:hover {
+            background-color: #ffffff20;
+            color: var(--text-color);
+        }
+        .copy-button.copied {
+            background-color: rgba(40, 167, 69, 0.2);
+            color: var(--success-color);
+            border-color: rgba(40, 167, 69, 0.4);
+        }
+        
+        /* --- Footer --- */
+        footer {
+            margin-top: 2rem;
+            font-size: 0.8rem;
+        }
+        footer a {
+            color: var(--secondary-text-color);
+            text-decoration: none;
+            border-bottom: 1px dotted var(--secondary-text-color);
+            transition: color 0.2s ease, border-color 0.2s ease;
+        }
+        footer a:hover {
+            color: var(--text-color);
+            border-bottom-color: var(--text-color);
+        }
+
+    </style>
+</head>
+<body>
+
+<main class="auth-card">
+    <div class="success-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+        </svg>
+    </div>
+    <h1>Authentication Successful</h1>
+    <p>Your account is now linked. To complete the setup, copy the command below and run it in your terminal.</p>
+    
+    <div class="code-block">
+        <button class="copy-button">Copy</button>
+        <code>
+            <span class="prompt">$</span>
+            <span class="command">zaptun auth</span>
+           <span id="auth-token" class="token">##TOKEN##</span>
+        </code>
+    </div>
+
+    <footer>
+        <p>You can now safely close this window. <a href="/">Return to ZapTun.</a></p>
+    </footer>
+</main>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    // --- Cursor Spotlight Effect ---
+    window.addEventListener('mousemove', e => {
+        document.body.style.setProperty('--x', e.clientX + 'px');
+        document.body.style.setProperty('--y', e.clientY + 'px');
+    });
+
+    // --- Copy to Clipboard ---
+    const copyButton = document.querySelector('.copy-button');
+    const codeBlock = document.querySelector('.code-block code');
+
+    if (copyButton && codeBlock) {
+        copyButton.addEventListener('click', () => {
+            // Reconstruct the command text without the '$' prompt
+            const commandToCopy = codeBlock.innerText.replace('$', '').trim();
+            
+            navigator.clipboard.writeText(commandToCopy).then(() => {
+                const originalText = copyButton.textContent;
+                copyButton.textContent = 'Copied!';
+                copyButton.classList.add('copied');
+                
+                setTimeout(() => {
+                    copyButton.textContent = originalText;
+                    copyButton.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+            });
+        });
+    }
+});
+</script>
+
+</body>
+</html>
