@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/harsh082ip/ZapTun/config"
+	"github.com/harsh082ip/ZapTun/internal/server/github"
 	log "github.com/harsh082ip/ZapTun/pkg/logger"
 	"github.com/hashicorp/yamux"
 )
@@ -15,20 +16,27 @@ type Client struct {
 	listener net.Listener
 }
 
-type Server struct {
-	conf        *config.ServerConfig
-	logger      *log.Logger
-	clients     map[string]*Client
-	mutex       sync.RWMutex
-	nextTCPPort int
+type User struct {
+	tunnels   map[string]*Client
+	maxTunnel int
 }
 
-func NewServer(conf *config.ServerConfig, logger *log.Logger) *Server {
+type Server struct {
+	conf          *config.ServerConfig
+	logger        *log.Logger
+	users         map[string]*User
+	mutex         sync.RWMutex
+	nextTCPPort   int
+	authenticator github.Authenticator
+}
+
+func NewServer(conf *config.ServerConfig, logger *log.Logger, oauth github.Authenticator) *Server {
 	return &Server{
-		conf:        conf,
-		logger:      logger,
-		clients:     make(map[string]*Client),
-		nextTCPPort: 30000, // will change port allocation logic in future PRs
+		conf:          conf,
+		logger:        logger,
+		users:         make(map[string]*User),
+		nextTCPPort:   30000, // will change port allocation logic in future PRs
+		authenticator: oauth,
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/harsh082ip/ZapTun/config"
 	"github.com/harsh082ip/ZapTun/internal/server"
+	"github.com/harsh082ip/ZapTun/internal/server/github"
 	"github.com/harsh082ip/ZapTun/pkg/logger"
 	"github.com/rs/zerolog"
 )
@@ -15,6 +16,10 @@ func main() {
 	cfg, err := config.LoadServerConfig("")
 	if err != nil {
 		log.Fatalf("Failed to load server config: %v", err)
+	}
+
+	if cfg.GitHubClientID == "" || cfg.GitHubClientSecret == "" {
+		log.Fatalf("missing github client id/secret")
 	}
 
 	var logWriter io.Writer = os.Stdout
@@ -33,9 +38,10 @@ func main() {
 	}
 
 	appLogger := logger.NewLogger(logWriter, logLevel, "tunnel-server")
+	oauth := github.New(cfg.GitHubClientID, cfg.GitHubClientSecret)
 
 	// start the server
-	srv := server.NewServer(cfg, appLogger)
+	srv := server.NewServer(cfg, appLogger, oauth)
 	appLogger.LogInfoMessage().Msg("Starting Zaptun server...")
 	if err := srv.Start(); err != nil {
 		appLogger.LogFatalMessage().Err(err).Msg("Server failed to start")

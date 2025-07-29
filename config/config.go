@@ -3,7 +3,9 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
+	"path/filepath"
 )
 
 const (
@@ -11,31 +13,36 @@ const (
 	ClientConfigFilePath = "client_config.json"
 )
 
-// ServerConfig holds all configuration for the tunnel-server.
+var localConfig = ".zaptun-config"
+var remoteConfig = "http://localhost:8080/config.json"
+
 type ServerConfig struct {
-	Domain           string `json:"domain"`             // e.g., "zaptun.site"
-	ControlPlaneAddr string `json:"control_plane_addr"` // e.g., ":4443"
-	DataPlaneAddr    string `json:"data_plane_addr"`    // e.g., ":80"
-	LogFile          string `json:"log_file"`           // e.g., "/var/log/zaptun/server.log"
-	LogLevel         string `json:"log_level"`          // e.g., "info", "debug"
-	CertificatePath  string `json:"certificate_path"`
-	PrivateKeyPath   string `json:"private_key_path"`
+	Domain             string `json:"domain"`
+	ControlPlaneAddr   string `json:"control_plane_addr"`
+	DataPlaneAddr      string `json:"data_plane_addr"`
+	LogFile            string `json:"log_file"`
+	LogLevel           string `json:"log_level"`
+	CertificatePath    string `json:"certificate_path"`
+	PrivateKeyPath     string `json:"private_key_path"`
+	GitHubClientID     string `json:"github_client_id"`
+	GitHubClientSecret string `json:"github_client_secret"`
 }
 
-// ClientConfig holds all configuration for the tunnel-client.
 type ClientConfig struct {
-	ServerAddr string `json:"server_addr"` // e.g., "zaptun.site:4443"
-	AuthToken  string `json:"auth_token"`  // The token to authenticate with the server
+	Remote struct {
+		ServerAddr string `json:"server_addr"`
+	}
+	Local struct {
+		AuthToken string `json:"auth_token"`
+	}
 }
 
-// LoadServerConfig loads server configuration from a given JSON file path.
 func LoadServerConfig(path string) (*ServerConfig, error) {
 	if path == "" {
 		path = ServerConfigFilePath
 	}
 	if !fileExists(path) {
-		// Return an error if the file doesn't exist
-		return &ServerConfig{}, fmt.Errorf("server config needed to start the server")
+		return nil, fmt.Errorf("server config needed to start the server")
 	}
 
 	f, err := os.ReadFile(path)
@@ -52,26 +59,54 @@ func LoadServerConfig(path string) (*ServerConfig, error) {
 	return &cfg, nil
 }
 
-// LoadClientConfig loads client configuration from a given JSON file path.
-func LoadClientConfig(path string) (*ClientConfig, error) {
-	if path == "" {
-		path = ClientConfigFilePath
-	}
-	if !fileExists(path) {
-		// Return a default configuration if the file doesn't exist
-		return nil, fmt.Errorf("config file doesn't exists")
-	}
-
-	f, err := os.ReadFile(path)
+func LoadClientConfig() (*ClientConfig, error) {
+	var c ClientConfig
+	configDir, err := os.UserConfigDir()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error getting user config directory: %s", err)
 	}
-
-	var cfg ClientConfig
-	err = json.Unmarshal(f, &cfg)
+	filePath := filepath.Join(configDir, "zaptun", localConfig)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error: no auth token, obtain at https://zaptun.com/auth")
 	}
+	if err := json.Unmarshal(data, &c.Local); err != nil {
+		return nil, fmt.Errorf("error unmarshaling config file contents: %s", err)
+	}
+	response, err := http.Get(remoteConfig)
+	if err != nil || response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("error fetching %s: %s", remoteConfig, err)
+	}
+	defer response.Body.Close()
 
-	return &cfg, nil
+	if err := json.NewDecoder(response.Body).Decode(&c.Remote); err != nil {
+		return nil, fmt.Errorf("error decoding config file: %s", err)
+	}
+	return &c, nil
+}
+
+func WriteAuthToken(token string) error {
+	var c ClientConfig
+	c.Local.AuthToken = token
+	content, err := json.Marshal(c.Local)
+	if err != nil {
+		return fmt.Errorf("error marshaling config: %s", err)
+	}
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return fmt.Errorf("error getting user config directory: %s", err)
+	}
+	dirPath := filepath.Join(configDir, "zaptun")
+	if err := os.MkdirAll(dirPath, 0700); err != nil && os.IsNotExist(err) {
+		return fmt.Errorf("error creating config directory: %s", err)
+	}
+	filePath := filepath.Join(dirPath, localConfig)
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return fmt.Errorf("error creating config file: %s", err)
+	}
+	if _, err = file.Write(content); err != nil {
+		return fmt.Errorf("error writitng to config file: %s", err)
+	}
+	return nil
 }

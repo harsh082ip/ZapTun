@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 
+	"github.com/harsh082ip/ZapTun/internal/server/github"
 	"github.com/harsh082ip/ZapTun/pkg/tunnel"
 	"github.com/hashicorp/yamux"
 )
@@ -76,6 +77,37 @@ func (s *Server) handleConnection(conn net.Conn) {
 		return
 	}
 
+	// get access token from client
+	var token string
+	if err := json.NewDecoder(ctrlStream).Decode(&token); err != nil {
+		s.logger.LogErrorMessage().Err(err).Msgf("failed to get Auth token from client")
+		return
+	}
+
+	// validate auth token
+	user, err := s.authenticator.Authenticate(token)
+	if err != nil {
+		s.logger.LogErrorMessage().Err(err).Msgf("failed to authenticate user")
+		// also tell the client
+		msg := fmt.Sprintf("authentication failed %s", "obtain auth token from http://zapyun.com/auth\n")
+		if _, err := ctrlStream.Write([]byte(msg)); err != nil {
+			s.logger.LogErrorMessage().Err(err).Msgf("failed to send auth error msg to the client")
+		}
+	}
+	s.logger.LogInfoMessage().Msgf("allowd: %v", user.Allowed)
+
+	if !user.Allowed {
+		msg := fmt.Sprintf("authentication failed %s", "obtain auth token from http://zaptun.com/auth\n")
+		if _, err := ctrlStream.Write([]byte(msg)); err != nil {
+			s.logger.LogErrorMessage().Err(err).Msgf("failed to send auth error msg to the client")
+		}
+	}
+
+	if _, err := ctrlStream.Write([]byte("auth_ok\n")); err != nil {
+		s.logger.LogErrorMessage().Err(err).Msgf("failed to send auth success msg to client")
+		return
+	}
+
 	// decode tunnel type from ctrlstream
 	var msg tunnel.ControlMessage
 	if err := json.NewDecoder(ctrlStream).Decode(&msg); err != nil {
@@ -85,110 +117,146 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 	switch msg.Type {
 	case "http":
-		s.handleHTTPTunnel(conn, session, ctrlStream)
+		s.handleHTTPTunnel(session, ctrlStream, &user)
 	case "tcp":
-		s.handleTCPTunnel(conn, session, ctrlStream)
+		s.handleTCPTunnel(session, ctrlStream, &user)
 	}
 }
 
-// handleHTTPTunnel contains the logic for setting up an HTTP tunnel.
-func (s *Server) handleHTTPTunnel(conn net.Conn, session *yamux.Session, ctrlStream net.Conn) {
+func (s *Server) handleHTTPTunnel(session *yamux.Session, ctrlStream net.Conn, user *github.User) {
 	s.logger.LogInfoMessage().Msg("Handling HTTP tunnel request...")
 
-	// Generate unique subdomain
-	var clientID string
-	for {
-		clientID = generateRandomSubdomain(8)
-		s.mutex.RLock()
-		_, clientExists := s.clients[clientID]
-		s.mutex.RUnlock()
-		if !clientExists {
-			break
+	s.mutex.Lock()
+
+	userRecord, exists := s.users[user.Login]
+	if !exists {
+		userRecord = &User{
+			tunnels:   make(map[string]*Client),
+			maxTunnel: 2,
+		}
+		s.users[user.Login] = userRecord
+	}
+
+	if len(userRecord.tunnels) >= userRecord.maxTunnel {
+		s.mutex.Unlock()
+		msg := fmt.Sprintf("err: max http tunnel limit reached (%d)", userRecord.maxTunnel)
+		ctrlStream.Write([]byte(msg + "\n"))
+		s.logger.LogWarnMessage().Msgf("Max tunnel limit reached for user: %v", user.Login)
+		return
+	}
+
+	tunnelID := user.Login
+	if _, idExists := userRecord.tunnels[tunnelID]; idExists {
+		for i := 1; ; i++ {
+			numberedID := fmt.Sprintf("%s-%d", user.Login, i)
+			if _, idExists := userRecord.tunnels[numberedID]; !idExists {
+				tunnelID = numberedID
+				break
+			}
 		}
 	}
 
 	newClient := &Client{
-		id:      clientID,
+		id:      tunnelID,
 		session: session,
 	}
-	s.mutex.Lock()
-	s.clients[clientID] = newClient
+	userRecord.tunnels[tunnelID] = newClient
+
 	s.mutex.Unlock()
 
 	defer func() {
 		s.mutex.Lock()
-		delete(s.clients, clientID)
+		if userRec, ok := s.users[user.Login]; ok {
+			delete(userRec.tunnels, tunnelID)
+			if len(userRec.tunnels) == 0 {
+				delete(s.users, user.Login)
+			}
+		}
 		s.mutex.Unlock()
 		session.Close()
-		s.logger.LogInfoMessage().Msgf("Client: %v disconnected. Removed from registry", clientID)
+		s.logger.LogInfoMessage().Msgf("Client tunnel %v disconnected. Removed from registry.", tunnelID)
 	}()
 
-	assignedURL := fmt.Sprintf("%s.%s", clientID, s.conf.Domain)
+	assignedURL := fmt.Sprintf("%s.%s", tunnelID, s.conf.Domain)
 	if _, err := ctrlStream.Write([]byte(assignedURL + "\n")); err != nil {
 		s.logger.LogErrorMessage().Err(err).Msg("Failed to send assigned URL to client")
 		return
 	}
-	s.logger.LogInfoMessage().Msgf("Assigned URL %s to client %s", assignedURL, conn.RemoteAddr().String())
+	s.logger.LogInfoMessage().Msgf("Assigned URL %s to user %s", assignedURL, user.Login)
 
-	// Block to keep the control stream alive and detect disconnection
 	io.Copy(io.Discard, ctrlStream)
 }
 
-func (s *Server) handleTCPTunnel(conn net.Conn, session *yamux.Session, ctrlStream net.Conn) {
+// handleTCPTunnel is now updated with fine-grained locking.
+func (s *Server) handleTCPTunnel(session *yamux.Session, ctrlStream net.Conn, user *github.User) {
 	s.logger.LogInfoMessage().Msg("Handling TCP tunnel request...")
 
-	// 1. Allocate a new port for this client
-	// will make port allocation logic more robust
 	s.mutex.Lock()
-	port := s.nextTCPPort
-	s.nextTCPPort++
-	s.mutex.Unlock()
 
-	publicAddr := fmt.Sprintf("0.0.0.0:%d", port)
+	userRecord, exists := s.users[user.Login]
+	if !exists {
+		userRecord = &User{
+			tunnels:   make(map[string]*Client),
+			maxTunnel: 2,
+		}
+		s.users[user.Login] = userRecord
+	}
 
-	// 2. Start a new public TCP listener on the allocated port
-	listener, err := net.Listen("tcp", publicAddr)
-	if err != nil {
-		s.logger.LogErrorMessage().Msgf("Failed to start public listener on %s, err: %+v", publicAddr, err)
-		// Inform the client that the setup failed
-		ctrlStream.Write([]byte("error: could not allocate public port\n"))
+	if len(userRecord.tunnels) >= userRecord.maxTunnel {
+		s.mutex.Unlock() // Unlock before returning
+		msg := fmt.Sprintf("err: max tcp tunnel limit reached (%d)", userRecord.maxTunnel)
+		ctrlStream.Write([]byte(msg + "\n"))
+		s.logger.LogWarnMessage().Msgf("Max tunnel limit reached for user: %v", user.Login)
 		return
 	}
 
-	s.logger.LogInfoMessage().Msgf("TCP tunnel listening for public connections on %s", publicAddr)
+	// Get the port number and release the lock
+	port := s.nextTCPPort
+	s.nextTCPPort++
 
-	// 3. Register the client, now including its listener
-	clientID := generateRandomSubdomain(8)
-	newClient := &Client{
-		id:       clientID,
-		session:  session,
-		listener: listener, // Store the listener
-	}
-	s.mutex.Lock()
-	s.clients[clientID] = newClient
 	s.mutex.Unlock()
 
-	// 4. Defer cleanup
+	publicAddr := fmt.Sprintf("0.0.0.0:%d", port)
+	listener, err := net.Listen("tcp", publicAddr)
+	if err != nil {
+		ctrlStream.Write([]byte("error: could not allocate public port\n"))
+		return
+	}
+	s.logger.LogInfoMessage().Msgf("TCP tunnel for %s listening on %s", user.Login, publicAddr)
+
+	tunnelID := fmt.Sprintf("tcp-%s-%d", user.Login, len(userRecord.tunnels)+1)
+	newClient := &Client{
+		id:       tunnelID,
+		session:  session,
+		listener: listener,
+	}
+
+	s.mutex.Lock()
+	s.users[user.Login].tunnels[tunnelID] = newClient
+	s.mutex.Unlock()
+
+	// Defer cleanup
 	defer func() {
 		s.mutex.Lock()
-		delete(s.clients, clientID)
+		if userRec, ok := s.users[user.Login]; ok {
+			delete(userRec.tunnels, tunnelID)
+			if len(userRec.tunnels) == 0 {
+				delete(s.users, user.Login)
+			}
+		}
 		s.mutex.Unlock()
 		session.Close()
 		listener.Close()
-		s.logger.LogInfoMessage().Msgf("Client %v disconnected. Closed public listener on %s.", clientID, publicAddr)
+		s.logger.LogInfoMessage().Msgf("Client tunnel %v disconnected. Closed public listener on %s.", tunnelID, publicAddr)
 	}()
 
-	// Inform the client of its public address
 	publicURL := fmt.Sprintf("%s:%d", s.conf.Domain, port)
 	if _, err := ctrlStream.Write([]byte(publicURL + "\n")); err != nil {
 		s.logger.LogErrorMessage().Err(err).Msg("Failed to send assigned URL to client")
 		return
 	}
 
-	// Start the proxying loop for the new public listener
 	go s.proxyTCP(listener, session)
-
-	// keep the control stream(zaptun-client) alive
 	io.Copy(io.Discard, ctrlStream)
 }
 
@@ -198,7 +266,6 @@ func (s *Server) proxyTCP(listener net.Listener, session *yamux.Session) {
 		// Accept a new connection from the public internet
 		publicConn, err := listener.Accept()
 		if err != nil {
-			// This error likely means the listener was closed, so we can exit.
 			s.logger.LogWarnMessage().Err(err).Msg("Public TCP listener failed to accept")
 			return
 		}

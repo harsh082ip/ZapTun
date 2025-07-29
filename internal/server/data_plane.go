@@ -23,62 +23,66 @@ func (s *Server) startDataPlane() {
 }
 
 func (s *Server) proxyHandler(w http.ResponseWriter, r *http.Request) {
-	// extract subdomain from requst header
+	// 1. Extract the full tunnel ID (the entire subdomain) from the host.
 	hostParts := strings.Split(r.Host, ".")
 	if len(hostParts) < 3 {
 		http.Error(w, "Invalid host format", http.StatusBadRequest)
 		return
 	}
-	clientID := hostParts[0]
-	s.logger.LogInfoMessage().Msgf("hostparts: %+v", hostParts)
+	tunnelID := hostParts[0]
 
-	// lookup for client in our registry
+	// 2. Extract the base username from the tunnel ID.
+	// This works for both "username" and "username-1".
+	userLogin := strings.Split(tunnelID, "-")[0]
+
+	// 3. Perform the two-step lookup in the new 'users' map.
 	s.mutex.RLock()
-	client, found := s.clients[clientID]
+	userRecord, userFound := s.users[userLogin]
+	var client *Client
+	var tunnelFound bool
+	if userFound {
+		// If the user exists, look for their specific tunnel.
+		client, tunnelFound = userRecord.tunnels[tunnelID]
+	}
 	s.mutex.RUnlock()
 
-	if !found {
-		s.logger.LogErrorMessage().Msgf("subdomain for client_id: %v not found in the regisry, or client has disconnected", clientID)
-		http.Error(w, fmt.Sprintf("subdomain for client_id: %v not found in the regisry, or client has disconnected", clientID), http.StatusNotFound)
+	if !tunnelFound {
+		msg := fmt.Sprintf("subdomain for client_id: %v not found in the registry, or client has disconnected", tunnelID)
+		s.logger.LogErrorMessage().Msg(msg)
+		http.Error(w, msg, http.StatusNotFound)
 		return
 	}
 
-	// Open a new stream to the client over its yamux session.
-	// This is a new, independent data channel.
 	proxyStream, err := client.session.OpenStream()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to open stream for client_id: %v, err: %v", clientID, err), http.StatusInternalServerError)
-		s.logger.LogErrorMessage().Msgf("failed to open stream for client_id: %v, err: %v", clientID, err)
+		msg := fmt.Sprintf("failed to open stream for client_id: %v, err: %v", tunnelID, err)
+		http.Error(w, msg, http.StatusInternalServerError)
+		s.logger.LogErrorMessage().Msg(msg)
 		return
 	}
 	defer proxyStream.Close()
 
 	s.logger.LogInfoMessage().Str("host", r.Host).Str("path", r.URL.Path).Msg("Proxying request")
 
-	// Forward the public user's request to the client via the stream.
 	if err := r.Write(proxyStream); err != nil {
-		s.logger.LogErrorMessage().Err(err).Msgf("Failed to write request to proxy stream for client %s", clientID)
+		s.logger.LogErrorMessage().Err(err).Msgf("Failed to write request to proxy stream for client %s", tunnelID)
 		return
 	}
 
-	// Read the response from the client via the stream and forward it back to the public user.
 	resp, err := http.ReadResponse(bufio.NewReader(proxyStream), r)
 	if err != nil {
-		// This can happen if the client-side service is down. Send a Bad Gateway error.
 		http.Error(w, "Error reading response from client service", http.StatusBadGateway)
-		s.logger.LogErrorMessage().Err(err).Msgf("Failed to read response from proxy stream for client %s", clientID)
+		s.logger.LogErrorMessage().Err(err).Msgf("Failed to read response from proxy stream for client %s", tunnelID)
 		return
 	}
 	defer resp.Body.Close()
 
-	// Copy headers from the client's response to our response writer.
 	for key, values := range resp.Header {
 		for _, value := range values {
 			w.Header().Add(key, value)
 		}
 	}
 
-	// Write the status code and the response body.
 	w.WriteHeader(resp.StatusCode)
 	io.Copy(w, resp.Body)
 }

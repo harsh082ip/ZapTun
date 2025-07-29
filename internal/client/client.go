@@ -8,9 +8,11 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/harsh082ip/ZapTun/config"
 	"github.com/harsh082ip/ZapTun/pkg/logger"
 	"github.com/harsh082ip/ZapTun/pkg/tunnel"
 	"github.com/hashicorp/yamux"
@@ -21,16 +23,18 @@ type Client struct {
 	serverAddr string
 	localPort  int
 	controlMsg *tunnel.ControlMessage
+	conf       *config.ClientConfig
 	logLevel   zerolog.Level
 	logger     *logger.Logger
 }
 
-func NewClient(serverAddr string, controlMsg *tunnel.ControlMessage, localPort int, log *logger.Logger) (*Client, error) {
+func NewClient(controlMsg *tunnel.ControlMessage, conf *config.ClientConfig, localPort int, log *logger.Logger) (*Client, error) {
 	return &Client{
-		serverAddr: serverAddr,
+		serverAddr: conf.Remote.ServerAddr,
 		localPort:  localPort,
 		controlMsg: controlMsg,
 		logger:     log,
+		conf:       conf,
 		logLevel:   zerolog.Disabled,
 	}, nil
 }
@@ -72,16 +76,39 @@ func (c *Client) connectAndServe() error {
 	}
 	defer ctrlStream.Close()
 
+	// send access token
+	err = json.NewEncoder(ctrlStream).Encode(c.conf.Local.AuthToken)
+	if err != nil {
+		return fmt.Errorf("failed to send control message: %w", err)
+	}
+
+	authResp, err := bufio.NewReader(ctrlStream).ReadString('\n')
+	if err != nil {
+		fmt.Printf("failed to read auth response: %v", err)
+		os.Exit(1)
+	}
+	authResp = strings.TrimSpace(authResp)
+	if authResp != "auth_ok" {
+		fmt.Printf("%s\n", authResp)
+		os.Exit(1)
+	}
+
 	err = json.NewEncoder(ctrlStream).Encode(c.controlMsg)
 	if err != nil {
 		return fmt.Errorf("failed to send control message: %w", err)
 	}
+	// log.Println(c.controlMsg)
 
 	response, err := bufio.NewReader(ctrlStream).ReadString('\n')
 	if err != nil {
 		return fmt.Errorf("failed to read response from server: %w", err)
 	}
 	response = strings.TrimSpace(response)
+	iserrorMsg := strings.Contains(response, "err:")
+	if iserrorMsg {
+		fmt.Println(response)
+		os.Exit(1)
+	}
 
 	if c.controlMsg.Type == "http" {
 		if c.logLevel == zerolog.Disabled {
