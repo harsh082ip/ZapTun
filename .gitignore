@@ -4,7 +4,7 @@ client_config.json
 server.log
 zaptun-server
 stress-test
-zaptun-client
+# zaptun-client
 local-server
 zaptun
 bin/
