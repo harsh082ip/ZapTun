@@ -3,9 +3,12 @@ server_config.json
 client_config.json
 server.log
 zaptun-server
-*.json
 stress-test
 zaptun-client
 local-server
 zaptun
 bin/
+client_config.json
+deploy-server-config.json
+server_config.json
+config.json
