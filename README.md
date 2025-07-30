@@ -162,8 +162,8 @@ The project follows the standard Go project layout to maintain a clean separatio
 
 ## Future Improvements
 
-  * **TLS Encryption**: Secure the client-server connection using `crypto/tls`.
-  * **TCP Tunnels**: Add support for forwarding non-HTTP traffic, such as SSH or database connections.
-  * **Authentication**: Implement a token-based system to control who can use the service.
+  * **Serve static content**: Add support for serving static files
   * **Custom Subdomains**: Allow clients to request a specific subdomain via a command-line flag.
   * **Web Dashboard**: A status page served by the client to inspect traffic in real-time.
+
+<a href="https://buymeacoffee.com/harshyt1975" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
