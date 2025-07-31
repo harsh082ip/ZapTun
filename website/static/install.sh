@@ -2,7 +2,7 @@
 
 set -e
 
-URL_PREFIX="https://github.com/harsh082ip/ZapTun/releases/download/2.4"
+URL_PREFIX="https://github.com/harsh082ip/ZapTun/releases/download/v0.1.0"
 INSTALL_DIR=${INSTALL_DIR:-/usr/local/bin}
 
 case "$(uname -sm)" in

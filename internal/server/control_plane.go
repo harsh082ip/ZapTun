@@ -89,7 +89,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 	if err != nil {
 		s.logger.LogErrorMessage().Err(err).Msgf("failed to authenticate user")
 		// also tell the client
-		msg := fmt.Sprintf("authentication failed %s", "obtain auth token from http://zapyun.com/auth\n")
+		msg := fmt.Sprintf("authentication failed %s", "obtain auth token from https://zaptun.com/auth\n")
 		if _, err := ctrlStream.Write([]byte(msg)); err != nil {
 			s.logger.LogErrorMessage().Err(err).Msgf("failed to send auth error msg to the client")
 		}
@@ -97,7 +97,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 	s.logger.LogInfoMessage().Msgf("allowd: %v", user.Allowed)
 
 	if !user.Allowed {
-		msg := fmt.Sprintf("authentication failed %s", "obtain auth token from http://zaptun.com/auth\n")
+		msg := fmt.Sprintf("authentication failed %s", "obtain auth token from https://zaptun.com/auth\n")
 		if _, err := ctrlStream.Write([]byte(msg)); err != nil {
 			s.logger.LogErrorMessage().Err(err).Msgf("failed to send auth error msg to the client")
 		}

@@ -22,6 +22,12 @@ var html string
 //go:embed static/token.html
 var tokenHtml string
 
+//go:embed static/install.sh
+var install string
+
+//go:embed static/install.ps1
+var ps1Installer string
+
 func main() {
 	clientId := os.Getenv("GITHUB_CLIENT_ID")
 	clientSecret := os.Getenv("GITHUB_CLIENT_SECRET")
@@ -30,13 +36,15 @@ func main() {
 	}
 	oauth = github.New(clientId, clientSecret)
 
-	log.Println("Starting server on http://localhost:8080")
+	log.Println("Starting server on http://localhost:8883")
 
 	http.HandleFunc("/", serveStaticContent([]byte(html), "text/html"))
 	http.HandleFunc("/config.json", serveStaticContent([]byte(config), "application/json"))
+	http.HandleFunc("/install.sh", serveStaticContent([]byte(install), "text/x-shellscript"))
+	http.HandleFunc("/install.ps1", serveStaticContent([]byte(ps1Installer), "application/octet-stream"))
 	http.HandleFunc("/auth", authHandler)
 	http.HandleFunc("/auth-callback", authCallback)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8883", nil))
 }
 
 func serveStaticContent(content []byte, contentType string) func(w http.ResponseWriter, r *http.Request) {

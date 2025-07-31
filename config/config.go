@@ -14,7 +14,7 @@ const (
 )
 
 var localConfig = ".zaptun-config"
-var remoteConfig = "http://localhost:8080/config.json"
+var remoteConfig = "https://zaptun.com/config.json"
 
 type ServerConfig struct {
 	Domain             string `json:"domain"`

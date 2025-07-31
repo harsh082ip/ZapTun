@@ -38,7 +38,7 @@ func New(clientId, clientSecret string) Authenticator {
 		clientSecret: clientSecret,
 		defaultScope: "user:email",
 		userEndpoint: "https://api.github.com/user",
-		redirectUri:  "http://localhost:8080/auth-callback",
+		redirectUri:  "https://zaptun.com/auth-callback",
 	}
 }
 
