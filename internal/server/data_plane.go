@@ -31,6 +31,16 @@ func (s *Server) proxyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	tunnelID := hostParts[0]
 
+	// [note]: I am using nginx, that is routing user's request to my server, so all requests come from localhost.
+	// To get the actual user's IP, I need to read it from the X-Forwarded-For header set by Nginx.
+	// if u dont wish to use that, fallback will work for you
+	userIP := r.Header.Get("X-Forwarded-For")
+	if userIP == "" {
+		userIP = strings.Split(r.RemoteAddr, ":")[0] // fallback
+	}
+
+	r.Header.Set("X-Forwarded-For", userIP)
+
 	// 2. Extract the base username from the tunnel ID.
 	// This works for both "username" and "username-1".
 	userLogin := strings.Split(tunnelID, "-")[0]

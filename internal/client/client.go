@@ -147,9 +147,9 @@ func (c *Client) connectAndServe() error {
 func (c *Client) handleProxyStream(proxyStream net.Conn, tunnelType string) {
 	defer proxyStream.Close()
 	c.logger.LogInfoMessage().Msgf("Accepted new %s stream from server", tunnelType)
-	if c.logLevel == zerolog.Disabled {
-		fmt.Printf("Incoming: \t %s \n", proxyStream.RemoteAddr())
-	}
+	// if c.logLevel == zerolog.Disabled {
+	// 	fmt.Printf("Incoming: \t %s (%s %s)\n", originalIP, req.Method, req.URL.Path)
+	// }
 	addr := fmt.Sprintf("localhost:%d", c.localPort)
 	localServiceConn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -178,6 +178,12 @@ func (c *Client) handleProxyStream(proxyStream net.Conn, tunnelType string) {
 			c.logger.LogErrorMessage().Err(err).Msg("Failed to read http request from server")
 			return
 		}
+		originalIP := req.Header.Get("X-Forwarded-For")
+		if originalIP == "" {
+			originalIP = "unknown"
+		}
+
+		fmt.Printf("Incoming: \t %s (%s %s)\n", originalIP, req.Method, req.URL.Path)
 
 		if err := req.Write(localServiceConn); err != nil {
 			c.logger.LogErrorMessage().Err(err).Msg("Failed to write request to local service")
