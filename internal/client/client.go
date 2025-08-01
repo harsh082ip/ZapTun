@@ -150,17 +150,23 @@ func (c *Client) handleProxyStream(proxyStream net.Conn, tunnelType string) {
 	if c.logLevel == zerolog.Disabled {
 		fmt.Printf("Incoming: \t %s \n", proxyStream.RemoteAddr())
 	}
-	localServiceConn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", c.localPort))
+	addr := fmt.Sprintf("localhost:%d", c.localPort)
+	localServiceConn, err := net.Dial("tcp", addr)
 	if err != nil {
-		c.logger.LogErrorMessage().Err(err).Msgf("Failed to connect to local service on port %d", c.localPort)
-		if tunnelType == "http" {
-			resp := &http.Response{
-				StatusCode: http.StatusBadGateway,
-				Body:       io.NopCloser(strings.NewReader("Local service unavailable")),
+		// Fallback to IPv6 loopback if IPv4 fails
+		addrV6 := fmt.Sprintf("[::1]:%d", c.localPort)
+		localServiceConn, err = net.Dial("tcp", addrV6)
+		if err != nil {
+			c.logger.LogErrorMessage().Err(err).Msgf("Failed to connect to local service on %s or %s", addr, addrV6)
+			if tunnelType == "http" {
+				resp := &http.Response{
+					StatusCode: http.StatusBadGateway,
+					Body:       io.NopCloser(strings.NewReader("Local service unavailable")),
+				}
+				resp.Write(proxyStream)
 			}
-			resp.Write(proxyStream)
+			return
 		}
-		return
 	}
 
 	defer localServiceConn.Close()
