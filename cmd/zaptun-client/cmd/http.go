@@ -24,7 +24,6 @@ var httpCmd = &cobra.Command{
 			fmt.Println("Invalid port number.")
 			os.Exit(1)
 		}
-		// Call the new shared function
 		startTunnel("http", localPort)
 	},
 }
@@ -33,7 +32,6 @@ func init() {
 	rootCmd.AddCommand(httpCmd)
 }
 
-// startTunnel is the new shared logic for creating any tunnel.
 func startTunnel(tunnelType string, localPort int) {
 	clientCfg, err := config.LoadClientConfig()
 	if err != nil {

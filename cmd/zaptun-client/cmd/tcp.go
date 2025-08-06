@@ -18,7 +18,6 @@ var tcpCmd = &cobra.Command{
 			fmt.Println("Invalid port number.")
 			os.Exit(1)
 		}
-		// Call the shared function
 		startTunnel("tcp", localPort)
 	},
 }

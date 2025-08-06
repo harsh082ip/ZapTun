@@ -40,7 +40,6 @@ and exposes it to the internet through a Zaptun HTTP tunnel.`,
 		fmt.Printf("Serving directory '%s' on local port %d...\n", dir, localPort)
 
 		go func() {
-			// Create a file server handler for the specified directory.
 			fileServer := http.FileServer(http.Dir(dir))
 
 			if err := http.Serve(listener, fileServer); err != nil {
@@ -48,8 +47,6 @@ and exposes it to the internet through a Zaptun HTTP tunnel.`,
 			}
 		}()
 
-		// 4. Start an HTTP tunnel to the port our file server is running on.
-		// This reuses the exact same logic as the 'zaptun-client http' command.
 		startTunnel("http", localPort)
 	},
 }

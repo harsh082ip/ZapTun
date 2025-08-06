@@ -1,5 +1,5 @@
 $arch = if ([Environment]::Is64BitOperatingSystem) { "amd64" } else { "386" }
-$version = "v0.1.0" 
+$version = "v0.2.0" 
 $exeName = "zaptun-windows-$arch.exe"
 $installDir = "$env:ProgramFiles\Zaptun"
 $exePath = "$installDir\zaptun.exe"
