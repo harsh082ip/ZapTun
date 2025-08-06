@@ -372,6 +372,17 @@
                     <pre><code><span class="comment"># Expose local port 22 via TCP for SSH</span>
 <span class="command">zaptun</span> tcp 22</code></pre>
                 </div>
+
+                <h3>Serve Static Files</h3>
+                <p>Instantly share a local folder or host a static website directly from your machine.</p>
+                <div class="code-block">
+                    <button class="copy-button" aria-label="Copy code">Copy</button>
+                    <pre><code><span class="comment"># Serve the current directory</span>
+<span class="command">zaptun</span> serve
+
+<span class="comment"># Or serve a specific folder</span>
+<span class="command">zaptun</span> serve <span class="path">./my-website</span></code></pre>
+                </div>
             </section>
 
         </main>
